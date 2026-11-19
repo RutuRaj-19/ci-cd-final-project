@@ -1,0 +1,48 @@
+
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: cleanup
+spec:
+  workspaces:
+    - name: source
+
+  steps:
+    - name: remove
+      image: alpine:3
+
+      env:
+        - name: WORKSPACE_SOURCE_PATH
+          value: $(workspaces.source.path)
+
+      workingDir: $(workspaces.source.path)
+
+      securityContext:
+        runAsNonRoot: false
+        runAsUser: 0
+
+      script: |
+        #!/usr/bin/env sh
+        set -eu
+
+        echo "Removing all files from ${WORKSPACE_SOURCE_PATH} ..."
+
+        # Refuse to clean an empty path or filesystem root.
+        if [ -z "${WORKSPACE_SOURCE_PATH}" ] || [ "${WORKSPACE_SOURCE_PATH}" = "/" ]; then
+          echo "Unsafe workspace path. Cleanup cancelled." >&2
+          exit 1
+        fi
+
+        # Delete existing contents if the directory exists.
+        if [ -d "${WORKSPACE_SOURCE_PATH}" ] ; then
+
+          # Delete non-hidden files and directories.
+          rm -rf "${WORKSPACE_SOURCE_PATH:?}"/*
+
+          # Delete hidden files and directories, excluding ..
+          rm -rf "${WORKSPACE_SOURCE_PATH}"/.[!.]*
+
+          # Delete names starting with two dots and another character.
+          rm -rf "${WORKSPACE_SOURCE_PATH}"/..?*
+
+        fi
